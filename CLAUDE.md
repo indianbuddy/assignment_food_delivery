@@ -119,6 +119,16 @@ without understanding first:
 
 ## Things this project deliberately does not have
 
-No UI, no CI/CD config, no Dockerfile/docker-compose for the app itself, no
+No CI/CD config, no Dockerfile/docker-compose for the app itself, no
 OAuth/SSO. These are explicitly out of scope per the assignment - don't add
 them "for completeness."
+
+`src/main/resources/static/` (`index.html`/`app.js`/`styles.css`) is a
+deliberate exception: a UI/frontend is also explicitly out of scope, but a
+minimal one was added anyway at the requester's explicit ask, purely to make
+the recorded walkthrough demoable - see README's "Demo UI (bonus, out of
+scope)" section. It's not held to the same bar as the rest of the codebase
+(no tests, no design polish) and calls the same `/api/**` endpoints as any
+other client with no special access. Don't let its existence set a precedent
+for adding more UI - it's demo scaffolding, not a direction to keep building
+in.

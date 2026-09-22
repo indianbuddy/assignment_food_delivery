@@ -20,6 +20,7 @@ intentionally open-ended assignment, and how to build/run/test the project.
 - [Assumptions](#assumptions)
 - [Running locally](#running-locally)
 - [Testing](#testing)
+- [Demo UI (bonus, out of scope)](#demo-ui-bonus-out-of-scope)
 - [AI workflow / Claude Code usage](#ai-workflow--claude-code-usage)
 - [Known limitations / explicitly out of scope](#known-limitations--explicitly-out-of-scope)
 
@@ -341,6 +342,30 @@ container's lifecycle to each test *class*, which fights with Spring's
 configuration (the container gets torn down after the first class while
 later classes keep reusing the cached, now-dangling context). This is
 Testcontainers' own documented pattern for this exact situation.
+
+## Demo UI (bonus, out of scope)
+
+**This is not part of the graded submission.** The assignment's brief lists
+"UI or frontend" under "Out of Scope" explicitly, and everything above this
+section is the actual submission. A basic UI was added afterward, at the
+requester's explicit ask, purely to make the recorded walkthrough video more
+watchable than a terminal full of `curl` output - it's called out here so
+it's unambiguous that this isn't an attempt to quietly expand scope.
+
+It's a small, framework-free static page (`src/main/resources/static/`:
+`index.html` + `app.js` + `styles.css`, no build step) served by the same
+Spring Boot app at `/`, calling the exact same JWT-protected `/api/**`
+endpoints as any other client - it gets no special access or shortcuts.
+Open `http://localhost:8080/` after starting the app (see "Running locally")
+to register/log in as any role and click through the flows: browse and
+place an order as a customer, manage a menu and accept/reject/prepare orders
+as a restaurant owner, go available and accept/deliver as a delivery
+partner, and manage cities/restaurants/partners as admin.
+
+Being out of scope, it wasn't held to the same bar as the rest of the
+codebase: no tests, no design-system polish, and role-appropriate error
+messages rather than hardened input validation. Treat it as a demo harness,
+not production frontend code.
 
 ## AI workflow / Claude Code usage
 

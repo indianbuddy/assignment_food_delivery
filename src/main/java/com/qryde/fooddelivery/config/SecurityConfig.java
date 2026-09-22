@@ -52,6 +52,11 @@ public class SecurityConfig {
 						.requestMatchers("/api/auth/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/cities/**", "/api/restaurants/**", "/api/menu-items/**").permitAll()
 						.requestMatchers("/actuator/health").permitAll()
+						// Static assets for the demo UI (see README - out of scope
+						// per the assignment, added anyway for the video demo; the
+						// UI itself calls the same JWT-protected /api/** endpoints
+						// as everyone else, it gets no special access).
+						.requestMatchers(HttpMethod.GET, "/", "/index.html", "/app.js", "/styles.css", "/favicon.ico").permitAll()
 						.anyRequest().authenticated()
 				)
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
