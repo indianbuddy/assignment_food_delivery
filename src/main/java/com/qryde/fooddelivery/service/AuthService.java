@@ -1,5 +1,6 @@
 package com.qryde.fooddelivery.service;
 
+import com.qryde.fooddelivery.domain.Role;
 import com.qryde.fooddelivery.domain.User;
 import com.qryde.fooddelivery.dto.auth.AuthResponse;
 import com.qryde.fooddelivery.dto.auth.LoginRequest;
@@ -25,6 +26,15 @@ public class AuthService {
 
 	@Transactional
 	public AuthResponse register(RegisterRequest request) {
+		// Public self-registration must never be able to mint an ADMIN account -
+		// admins are provisioned out-of-band (see README). CUSTOMER,
+		// RESTAURANT_OWNER and DELIVERY_PARTNER are all safe to self-register:
+		// none of them grant any capability by themselves - a restaurant/partner
+		// profile still has to be linked to the account by an existing admin
+		// before it can do anything role-specific.
+		if (request.role() == Role.ADMIN) {
+			throw new IllegalArgumentException("Admin accounts cannot be self-registered");
+		}
 		if (userRepository.existsByEmail(request.email())) {
 			throw new IllegalArgumentException("An account with this email already exists");
 		}

@@ -3,6 +3,7 @@ package com.qryde.fooddelivery.service;
 import com.qryde.fooddelivery.domain.Order;
 import com.qryde.fooddelivery.domain.OrderStatus;
 import com.qryde.fooddelivery.domain.Rating;
+import com.qryde.fooddelivery.domain.Role;
 import com.qryde.fooddelivery.dto.rating.RatingRequest;
 import com.qryde.fooddelivery.dto.rating.RatingResponse;
 import com.qryde.fooddelivery.exception.AccessDeniedBusinessException;
@@ -21,6 +22,7 @@ public class RatingService {
 
 	private final RatingRepository ratingRepository;
 	private final OrderService orderService;
+	private final RestaurantService restaurantService;
 
 	@Transactional
 	public RatingResponse rate(Long orderId, Long customerId, RatingRequest request) {
@@ -47,13 +49,21 @@ public class RatingService {
 		return toResponse(ratingRepository.save(rating));
 	}
 
-	public RatingResponse getForOrder(Long orderId) {
+	/**
+	 * A rating is order-linked data, so it's only visible to whoever can see
+	 * the order itself - reuses OrderService's viewer check rather than
+	 * duplicating "customer, restaurant owner, assigned partner, or admin"
+	 * a second time.
+	 */
+	public RatingResponse getForOrder(Long orderId, Long userId, Role role) {
+		orderService.getForViewer(orderId, userId, role);
 		return ratingRepository.findByOrderId(orderId)
 				.map(this::toResponse)
 				.orElseThrow(() -> new ResourceNotFoundException("No rating for order " + orderId));
 	}
 
-	public List<RatingResponse> listForRestaurant(Long restaurantId) {
+	public List<RatingResponse> listForRestaurant(Long restaurantId, Long ownerId) {
+		restaurantService.assertOwnership(restaurantService.findEntity(restaurantId), ownerId);
 		return ratingRepository.findByOrderRestaurantId(restaurantId).stream().map(this::toResponse).toList();
 	}
 

@@ -73,25 +73,37 @@ public class DeliveryPartnerService {
 	}
 
 	/**
-	 * The core "multiple partners contending for the same order" flow. The
-	 * conditional UPDATE in the repository is the single source of truth for
-	 * who wins; this method just interprets the affected-row count.
+	 * The core "multiple partners contending for the same order" flow -
+	 * plus the less obvious flip side of the same race: the same partner
+	 * accepting two different orders at once. Both sides are guarded by
+	 * their own atomic conditional UPDATE (never a read-then-write), so
+	 * either race resolves to exactly one winner with no explicit locking:
+	 *
+	 *  1. Claim the partner's own availability first
+	 *     (DeliveryPartnerRepository#updateStatusIfCurrent, AVAILABLE->BUSY).
+	 *     If this partner is already mid-assignment-request elsewhere, 0
+	 *     rows are affected and neither order gets touched.
+	 *  2. Claim the order (OrderRepository#assignPartnerIfUnassigned). If
+	 *     someone else already claimed it, this throws - and since both
+	 *     steps run in the same transaction, the partner-status flip from
+	 *     step 1 rolls back too, so a lost race never leaves the partner
+	 *     stuck BUSY with nothing assigned.
 	 */
 	@Transactional
 	public void acceptAssignment(Long orderId, Long userId) {
 		DeliveryPartner partner = findByUserId(userId);
-		if (partner.getStatus() != PartnerStatus.AVAILABLE) {
-			throw new IllegalArgumentException("Partner is not available to accept new orders");
+
+		int partnerClaimed = deliveryPartnerRepository.updateStatusIfCurrent(
+				partner.getId(), PartnerStatus.AVAILABLE, PartnerStatus.BUSY);
+		if (partnerClaimed == 0) {
+			throw new ConflictException("Partner is not currently available to accept new orders");
 		}
 
-		int updated = orderRepository.assignPartnerIfUnassigned(orderId, partner);
-		if (updated == 0) {
+		int orderClaimed = orderRepository.assignPartnerIfUnassigned(orderId, partner);
+		if (orderClaimed == 0) {
 			throw new ConflictException("Order is no longer available for assignment " +
 					"(already claimed by another partner, or not yet eligible)");
 		}
-
-		partner.setStatus(PartnerStatus.BUSY);
-		deliveryPartnerRepository.save(partner);
 
 		eventPublisher.publishEvent(new PartnerAssignedEvent(orderId, partner.getId()));
 	}

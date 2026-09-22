@@ -1,8 +1,10 @@
 package com.qryde.fooddelivery.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -33,6 +35,30 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ConflictException.class)
 	public ResponseEntity<ApiError> handleConflict(ConflictException ex, HttpServletRequest req) {
 		return build(HttpStatus.CONFLICT, ex.getMessage(), req);
+	}
+
+	/**
+	 * Optimistic-lock conflicts (e.g. two concurrent edits to the same
+	 * MenuItem's @Version-guarded fields) are an expected, legitimate
+	 * outcome of concurrent access, not a server error - map to 409 like
+	 * every other "someone else changed this first" case, not the generic
+	 * 500 handler below.
+	 */
+	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+	public ResponseEntity<ApiError> handleOptimisticLock(ObjectOptimisticLockingFailureException ex, HttpServletRequest req) {
+		return build(HttpStatus.CONFLICT, "This record was changed concurrently; please refresh and retry", req);
+	}
+
+	/**
+	 * Backstop for check-then-insert races guarded only by a DB unique
+	 * constraint (e.g. two concurrent registrations for the same email, or
+	 * the same user registering as a delivery partner twice at once): the
+	 * constraint is what actually prevents bad data, this just turns the
+	 * resulting failure into a normal 409 instead of a 500.
+	 */
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest req) {
+		return build(HttpStatus.CONFLICT, "This request conflicts with existing data", req);
 	}
 
 	@ExceptionHandler(AccessDeniedBusinessException.class)

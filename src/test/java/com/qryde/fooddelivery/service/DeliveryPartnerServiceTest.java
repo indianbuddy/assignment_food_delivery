@@ -31,48 +31,59 @@ class DeliveryPartnerServiceTest {
 	private DeliveryPartnerService deliveryPartnerService;
 
 	@Test
-	void acceptAssignment_losingRace_throwsConflict() {
+	void acceptAssignment_losingOrderRace_throwsConflictAndRollsBackPartnerClaim() {
 		User partnerUser = User.builder().id(7L).role(Role.DELIVERY_PARTNER).build();
 		DeliveryPartner partner = DeliveryPartner.builder().id(3L).user(partnerUser)
 				.status(PartnerStatus.AVAILABLE).build();
 
 		when(deliveryPartnerRepository.findByUserId(7L)).thenReturn(Optional.of(partner));
-		// 0 rows affected = someone else already claimed the order first.
+		// Partner successfully claims BUSY, but someone else already claimed
+		// the order first - 0 rows affected on the order-side CAS.
+		when(deliveryPartnerRepository.updateStatusIfCurrent(3L, PartnerStatus.AVAILABLE, PartnerStatus.BUSY))
+				.thenReturn(1);
 		when(orderRepository.assignPartnerIfUnassigned(eq(55L), eq(partner))).thenReturn(0);
 
 		assertThatThrownBy(() -> deliveryPartnerService.acceptAssignment(55L, 7L))
 				.isInstanceOf(ConflictException.class);
 
-		verify(deliveryPartnerRepository, never()).save(any());
+		// In the real transaction this failure rolls back the partner-status
+		// CAS too - that atomicity is exercised for real in
+		// ConcurrentPartnerAssignmentTest, not something a mock can show.
 		verify(eventPublisher, never()).publishEvent(any());
 	}
 
 	@Test
-	void acceptAssignment_winningRace_marksPartnerBusyAndPublishesEvent() {
+	void acceptAssignment_partnerNoLongerAvailable_throwsConflictBeforeTouchingOrder() {
 		User partnerUser = User.builder().id(7L).role(Role.DELIVERY_PARTNER).build();
 		DeliveryPartner partner = DeliveryPartner.builder().id(3L).user(partnerUser)
 				.status(PartnerStatus.AVAILABLE).build();
 
 		when(deliveryPartnerRepository.findByUserId(7L)).thenReturn(Optional.of(partner));
-		when(orderRepository.assignPartnerIfUnassigned(eq(55L), eq(partner))).thenReturn(1);
-		when(deliveryPartnerRepository.save(any(DeliveryPartner.class))).thenAnswer(inv -> inv.getArgument(0));
+		// 0 rows affected = partner was no longer AVAILABLE by the time this
+		// CAS ran (e.g. lost a race to accept a different order first).
+		when(deliveryPartnerRepository.updateStatusIfCurrent(3L, PartnerStatus.AVAILABLE, PartnerStatus.BUSY))
+				.thenReturn(0);
 
-		deliveryPartnerService.acceptAssignment(55L, 7L);
+		assertThatThrownBy(() -> deliveryPartnerService.acceptAssignment(55L, 7L))
+				.isInstanceOf(ConflictException.class);
 
-		verify(deliveryPartnerRepository).save(argThat(p -> p.getStatus() == PartnerStatus.BUSY));
-		verify(eventPublisher).publishEvent(any(com.qryde.fooddelivery.event.PartnerAssignedEvent.class));
+		verifyNoInteractions(orderRepository);
+		verify(eventPublisher, never()).publishEvent(any());
 	}
 
 	@Test
-	void acceptAssignment_partnerNotAvailable_rejectedBeforeTouchingOrder() {
+	void acceptAssignment_winningRace_publishesEvent() {
 		User partnerUser = User.builder().id(7L).role(Role.DELIVERY_PARTNER).build();
 		DeliveryPartner partner = DeliveryPartner.builder().id(3L).user(partnerUser)
-				.status(PartnerStatus.BUSY).build();
+				.status(PartnerStatus.AVAILABLE).build();
+
 		when(deliveryPartnerRepository.findByUserId(7L)).thenReturn(Optional.of(partner));
+		when(deliveryPartnerRepository.updateStatusIfCurrent(3L, PartnerStatus.AVAILABLE, PartnerStatus.BUSY))
+				.thenReturn(1);
+		when(orderRepository.assignPartnerIfUnassigned(eq(55L), eq(partner))).thenReturn(1);
 
-		assertThatThrownBy(() -> deliveryPartnerService.acceptAssignment(55L, 7L))
-				.isInstanceOf(IllegalArgumentException.class);
+		deliveryPartnerService.acceptAssignment(55L, 7L);
 
-		verifyNoInteractions(orderRepository);
+		verify(eventPublisher).publishEvent(any(com.qryde.fooddelivery.event.PartnerAssignedEvent.class));
 	}
 }

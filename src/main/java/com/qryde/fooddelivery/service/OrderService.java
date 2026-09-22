@@ -90,6 +90,9 @@ public class OrderService {
 			BigDecimal lineTotal = menuItem.getPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
 			total = total.add(lineTotal);
 
+			// Not saved directly here: Order.items cascades ALL, so adding to the
+			// in-memory collection is the single way these get persisted, once,
+			// when the order itself is saved below.
 			OrderItem orderItem = OrderItem.builder()
 					.order(order)
 					.menuItem(menuItem)
@@ -97,7 +100,6 @@ public class OrderService {
 					.quantity(itemRequest.quantity())
 					.priceAtOrder(menuItem.getPrice())
 					.build();
-			orderItemRepository.save(orderItem);
 			order.getItems().add(orderItem);
 		}
 
@@ -106,7 +108,7 @@ public class OrderService {
 
 		var payment = paymentService.charge(order, total, request.paymentMethod());
 		if (payment.getStatus() == PaymentStatus.FAILED) {
-			throw new IllegalStateException("Payment was declined; order could not be placed");
+			throw new ConflictException("Payment was declined; order could not be placed");
 		}
 
 		eventPublisher.publishEvent(new OrderPlacedEvent(order.getId()));
@@ -175,13 +177,13 @@ public class OrderService {
 		if (!order.getCustomer().getId().equals(customerId)) {
 			throw new AccessDeniedBusinessException("This order does not belong to you");
 		}
-		if (order.getStatus() != OrderStatus.PLACED && order.getStatus() != OrderStatus.ACCEPTED) {
-			throw new InvalidStateTransitionException(
-					"Order can only be cancelled while it is still PLACED or ACCEPTED (currently " +
-							order.getStatus() + ")");
-		}
-		OrderStatus previous = order.getStatus();
-		OrderResponse response = transition(order, previous, OrderStatus.CANCELLED);
+		// No separate "is this status cancellable" check here - OrderStatus's
+		// transition table is the single source of truth for that (only PLACED
+		// and ACCEPTED allow CANCELLED as a next state), so transition() below
+		// already rejects e.g. cancelling a PREPARING order with a clear
+		// InvalidStateTransitionException, without a second, hand-maintained
+		// copy of the same rule that could drift from the enum.
+		OrderResponse response = transition(order, order.getStatus(), OrderStatus.CANCELLED);
 		restock(order.getId());
 		return response;
 	}

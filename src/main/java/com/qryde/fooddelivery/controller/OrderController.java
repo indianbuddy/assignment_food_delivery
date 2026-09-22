@@ -58,7 +58,7 @@ public class OrderController {
 	}
 
 	@GetMapping("/{id}/rating")
-	public RatingResponse getRating(@PathVariable Long id) {
-		return ratingService.getForOrder(id);
+	public RatingResponse getRating(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
+		return ratingService.getForOrder(id, principal.getId(), principal.getUser().getRole());
 	}
 }

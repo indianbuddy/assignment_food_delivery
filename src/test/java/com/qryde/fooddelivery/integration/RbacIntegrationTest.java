@@ -1,11 +1,14 @@
 package com.qryde.fooddelivery.integration;
 
 import com.qryde.fooddelivery.domain.Role;
+import com.qryde.fooddelivery.domain.User;
 import com.qryde.fooddelivery.dto.auth.AuthResponse;
 import com.qryde.fooddelivery.dto.auth.RegisterRequest;
 import com.qryde.fooddelivery.dto.city.CityRequest;
 import com.qryde.fooddelivery.dto.order.OrderItemRequest;
 import com.qryde.fooddelivery.dto.order.PlaceOrderRequest;
+import com.qryde.fooddelivery.security.JwtService;
+import com.qryde.fooddelivery.util.TestDataFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -25,10 +28,28 @@ class RbacIntegrationTest extends AbstractIntegrationTest {
 
 	@Autowired
 	private TestRestTemplate restTemplate;
+	@Autowired
+	private TestDataFactory fixtures;
+	@Autowired
+	private JwtService jwtService;
+
+	@Test
+	void selfRegisteringAsAdminIsRejected() {
+		RegisterRequest request = new RegisterRequest(
+				"wannabe-admin-" + System.nanoTime() + "@test.qryde.com",
+				"Password123!", "Sneaky", "+10000000", Role.ADMIN);
+
+		ResponseEntity<String> response = restTemplate.postForEntity("/api/auth/register", request, String.class);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+	}
 
 	@Test
 	void adminOnlyEndpointRejectsOtherRolesAndAnonymous() {
-		String adminToken = registerAndLogin(Role.ADMIN);
+		// Admins are never self-registered (see AuthService#register) - create
+		// one directly, the way the real bootstrap mechanism would.
+		User adminUser = fixtures.createUser(Role.ADMIN);
+		String adminToken = jwtService.generateToken(adminUser.getId(), adminUser.getEmail(), Role.ADMIN.name());
 		String customerToken = registerAndLogin(Role.CUSTOMER);
 
 		CityRequest body = new CityRequest("Metropolis");

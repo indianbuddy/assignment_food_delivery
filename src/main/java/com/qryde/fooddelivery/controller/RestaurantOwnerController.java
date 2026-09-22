@@ -101,7 +101,8 @@ public class RestaurantOwnerController {
 	}
 
 	@GetMapping("/restaurants/{restaurantId}/ratings")
-	public List<RatingResponse> ratings(@PathVariable Long restaurantId) {
-		return ratingService.listForRestaurant(restaurantId);
+	public List<RatingResponse> ratings(@PathVariable Long restaurantId,
+										 @AuthenticationPrincipal UserPrincipal principal) {
+		return ratingService.listForRestaurant(restaurantId, principal.getId());
 	}
 }

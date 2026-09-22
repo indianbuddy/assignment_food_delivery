@@ -117,7 +117,7 @@ class OrderServicePlacementTest {
 		PlaceOrderRequest request = new PlaceOrderRequest(10L, List.of(new OrderItemRequest(100L, 1)), "FAIL_FOR_TEST");
 
 		assertThatThrownBy(() -> orderService.placeOrder(1L, request))
-				.isInstanceOf(IllegalStateException.class)
+				.isInstanceOf(com.qryde.fooddelivery.exception.ConflictException.class)
 				.hasMessageContaining("declined");
 		// Note: in the real (transactional) flow this exception rolls back the
 		// stock decrement too - that all-or-nothing behavior is what

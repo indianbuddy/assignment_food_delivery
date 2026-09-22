@@ -27,6 +27,11 @@ app:
   jwt:
     secret: ${JWT_SECRET:change-this-development-secret-to-something-long-and-random-in-prod}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  admin:
+    # Unset by default - the only way an ADMIN account is created (self-registration
+    # rejects the ADMIN role). Set both to provision the first admin on startup.
+    bootstrap-email: ${ADMIN_BOOTSTRAP_EMAIL:}
+    bootstrap-password: ${ADMIN_BOOTSTRAP_PASSWORD:}
 
 logging:
   level:
