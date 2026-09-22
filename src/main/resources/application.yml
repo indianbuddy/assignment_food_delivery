@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: food-delivery-order-mgmt
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/food_delivery}
+    username: ${DB_USERNAME:food_delivery}
+    password: ${DB_PASSWORD:food_delivery}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-development-secret-to-something-long-and-random-in-prod}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+logging:
+  level:
+    com.qryde.fooddelivery: INFO
